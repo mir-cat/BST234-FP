@@ -18,7 +18,7 @@ def solve_linear_regression(X, y):
 if __name__ =='__main__':
     KEY = 'X_1'
     RESPONSE = 'Y'
-    NUM_PERMUTATIONS = 10000
+    NUM_PERMUTATIONS = 1000
 
     perm_betas = [False for _ in range(NUM_PERMUTATIONS)]
 
@@ -27,13 +27,11 @@ if __name__ =='__main__':
     nrow = len(data['Y'])
     key_var = data[KEY].copy()
 
-    # I have 0 idea why a -1 is needed here... But it returns outside the
-    # availble range if you dont..
-    key_index = [i-1 for i in range(len(data.columns)) if data.columns[i] == KEY]
-
-
     response = data[RESPONSE]
     data.drop(RESPONSE, 1, inplace=True)
+
+    key_index = [i for i in range(len(data.columns)) if data.columns[i] == KEY]
+    print(data.columns[key_index])
 
     # Linear Regression Score Test
     time1 = time.process_time()
@@ -49,21 +47,10 @@ if __name__ =='__main__':
 
     time2 = time.process_time()
     print(time2 - time1)
-    
+
     if key_beta < 0:
         p_value = sum([(b < obs_beta) or (b > -1*obs_beta) for b in perm_betas])/NUM_PERMUTATIONS
     else :
         p_value = sum([(b > obs_beta) or (b < -1*obs_beta) for b in perm_betas])/NUM_PERMUTATIONS
 
-    print p_value
-
-
-
-    # # sum the number of permuted estimates that were more extreme than the
-    # # observed estimate
-    # # if obs_beta < 0:
-    # #     p_val = len
-    # # ???
-    #
-    # time2 = time.process_time()
-    # print(time2 - time1)
+    print(p_value)

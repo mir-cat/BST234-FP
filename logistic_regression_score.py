@@ -5,6 +5,7 @@ import time
 
 
 def import_data(path):
+    # path : string
     data = pd.read_csv(path)
     data = sm.add_constant(data)
     return data
