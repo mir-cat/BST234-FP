@@ -4,7 +4,13 @@ import statsmodels.api as sm
 import time
 from logistic_regression_score import import_data, permute_column
 
-# this is just for git
+def permute_column(data, col):
+    # data : pandas df
+    # col : string
+
+    data[col] = data[col].sample(frac=1, replace=True).reset_index(drop=True)
+
+
 def solve_linear_regression(X, y):
 
     # X : pandas dataframe

@@ -46,6 +46,7 @@ def null_score_stat(X, y, key):
 def permute_indices(N, n):
     # N, n : integers
     return [random.randint(0, N-1) for _ in range(n)]
+    
 if __name__ =='__main__':
     KEY = 'X_1'
     RESPONSE = 'Y'
