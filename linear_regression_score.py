@@ -4,7 +4,7 @@ import statsmodels.api as sm
 import time
 from logistic_regression_score import import_data, permute_column
 
-
+# this is just for git
 def solve_linear_regression(X, y):
 
     # X : pandas dataframe
