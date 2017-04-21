@@ -12,11 +12,38 @@ def import_data(path):
 
 def score_stat(residuals, variance, key_var):
     # residuals, variance, key_var : pandas Series
-    key_var_sq = key_var**2
 
-    score_numerator = residuals.transpose().dot(key_var)**2
-    score_denominator = key_var_sq.transpose().dot(variance)
+    resids = np.array(residuals)
+    vars = np.array(variance)
+    keyv = np.array(key_var)
+
+    time1 = time.process_time()
+
+    keyv_sq = keyv**2
+
+    score_numerator = resids.transpose().dot(keyv)**2
+    score_denominator = keyv_sq.transpose().dot(vars)
     score = score_numerator/score_denominator
+
+    time2 = time.process_time()
+    print(time2 - time1)
+
+    return score
+
+
+def score_statold(residuals, variance, key_var):
+    # residuals, variance, key_var : pandas Series
+
+    time1 = time.process_time()
+
+    key_var_sq = key_var ** 2
+
+    score_numerator = residuals.transpose().dot(key_var) ** 2
+    score_denominator = key_var_sq.transpose().dot(variance)
+    score = score_numerator / score_denominator
+
+    time2 = time.process_time()
+    print(time2 - time1)
 
     return score
 
@@ -26,7 +53,6 @@ def null_score_stat(X, y, key):
     # key : string
 
     key_var = X[key].copy()
-
     logreg = sm.Logit(y, X)
     fit = logreg.fit()
 
@@ -48,7 +74,7 @@ def permute_column(data, col):
 if __name__ =='__main__':
     KEY = 'X_1'
     RESPONSE = 'Y'
-    NUM_PERMUTATIONS = 10000
+    NUM_PERMUTATIONS = 100
 
     perm_scores = [False for _ in range(NUM_PERMUTATIONS)]
 
@@ -72,6 +98,8 @@ if __name__ =='__main__':
     for i in range(NUM_PERMUTATIONS):
         permute_column(data, KEY)
         perm_key_var = data[KEY].copy()
+        #print(len(perm_key_var),len(null_residuals))
+        #print(perm_key_var[0:50])
         perm_scores[i] = score_stat(null_residuals, null_variance, perm_key_var)
 
     p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
