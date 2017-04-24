@@ -4,6 +4,7 @@ import statsmodels.api as sm
 import time
 import random
 import timeit
+from multiprocessing import Pool, TimeoutError
 
 def import_data(path):
     # path : string
@@ -75,9 +76,15 @@ if __name__ =='__main__':
     # we permute the indices for 1s and 2s, and fill in the column
     perm_key_var = np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1))
 
-    indices = map(lambda _: permute_indices(NROW, NUM_NONZERO), range(NUM_PERMUTATIONS))
+    def f(x):
+        return permute_indices(NROW, NUM_NONZERO)
 
-    perm_scores = map(lambda pi: score_stat(null_residuals[pi], null_variance[pi], perm_key_var), indices)
+    def g(pi):
+        return score_stat(null_residuals[pi], null_variance[pi], perm_key_var)
+
+    with Pool(processes=None) as pool:
+        indices = pool.map(f, range(NUM_PERMUTATIONS))
+        perm_scores = pool.map(g, indices)
 
     p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
 
