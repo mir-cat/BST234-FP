@@ -15,25 +15,25 @@ def score_stat(residuals, variance, key_var):
     # residuals, variance, key_var : pandas Series
     key_var_sq = key_var**2
 
-    score_numerator = residuals.transpose().dot(key_var)**2
+    score_numerator = (residuals.transpose().dot(key_var))**2
     score_denominator = key_var_sq.transpose().dot(variance)
     score = score_numerator/score_denominator
 
     return score
 
-def null_score_stat(X, y, key):
+def null_score_stat(X, y, key_var):
     # X : pandas dataframe
     # y : pandas series 0-1-2
     # key : string
 
-    key_var = X[key].copy()
+    # key_var = X[key].copy()
 
     logreg = sm.Logit(y, X)
     fit = logreg.fit()
 
     fitted = fit.predict(X)
 
-    residuals = fitted - y
+    residuals = y - fitted
     # convert to numpy array for matrix calculation speed
     residuals = residuals.as_matrix()
 
@@ -45,8 +45,8 @@ def null_score_stat(X, y, key):
 
 def permute_indices(N, n):
     # N, n : integers
-    return [random.randint(0, N-1) for _ in range(n)]
-    
+    return np.random.choice(range(N), n, replace = False)
+
 if __name__ =='__main__':
     KEY = 'X_1'
     RESPONSE = 'Y'
@@ -64,25 +64,23 @@ if __name__ =='__main__':
 
     response = data[RESPONSE]
     data.drop(RESPONSE, 1, inplace=True)
+    data.drop(KEY, 1, inplace=True)
 
     # Logistic Regression Score Test
     time1 = time.process_time()
 
     key_var_sq = key_var**2 # 0-1-2 key
-    null_score, null_residuals, null_variance = null_score_stat(data, response, KEY)
+
+    null_score, null_residuals, null_variance = null_score_stat(data, response, key_var)
 
     # Instead of permuting the entire column, which is mostly 0s,
     # we permute the indices for 1s and 2s, and fill in the column
-    perm_key_var = pd.Series(np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1)))
+    perm_key_var = np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1))
 
     # speed this up
     for i in range(NUM_PERMUTATIONS):
-
         pi = permute_indices(NROW, NUM_NONZERO)
-
-        perm_null_residuals = null_residuals[pi]
-        perm_null_variance = null_variance[pi]
-        perm_scores[i] = score_stat(perm_null_residuals, perm_null_variance, perm_key_var)
+        perm_scores[i] = score_stat(null_residuals[pi], null_variance[pi], perm_key_var)
 
     p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
 
