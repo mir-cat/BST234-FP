@@ -3,7 +3,7 @@ import pandas as pd
 import statsmodels.api as sm
 import time
 import random
-
+import timeit
 
 def import_data(path):
     # path : string
@@ -45,7 +45,7 @@ def null_score_stat(X, y, key_var):
 
 def permute_indices(N, n):
     # N, n : integers
-    return np.random.choice(range(N), n, replace = False)
+    return random.sample(range(N), n)
 
 if __name__ =='__main__':
     KEY = 'X_1'
@@ -69,16 +69,14 @@ if __name__ =='__main__':
     # Logistic Regression Score Test
     time1 = time.process_time()
 
-    key_var_sq = key_var**2 # 0-1-2 key
-
     null_score, null_residuals, null_variance = null_score_stat(data, response, key_var)
 
     # Instead of permuting the entire column, which is mostly 0s,
     # we permute the indices for 1s and 2s, and fill in the column
     perm_key_var = np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1))
 
-    # speed this up
     indices = map(lambda _: permute_indices(NROW, NUM_NONZERO), range(NUM_PERMUTATIONS))
+
     perm_scores = map(lambda pi: score_stat(null_residuals[pi], null_variance[pi], perm_key_var), indices)
 
     p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
