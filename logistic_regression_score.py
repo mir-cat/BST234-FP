@@ -56,7 +56,7 @@ if __name__ =='__main__':
 
     data = import_data('data/data.csv')
     NROW = len(data['Y'])
-    key_var = data[KEY].copy()
+    key_var = data[KEY].as_matrix()
 
     NUM_ONES = sum(key_var == 1)
     NUM_TWOS = sum(key_var == 2)
@@ -78,9 +78,8 @@ if __name__ =='__main__':
     perm_key_var = np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1))
 
     # speed this up
-    for i in range(NUM_PERMUTATIONS):
-        pi = permute_indices(NROW, NUM_NONZERO)
-        perm_scores[i] = score_stat(null_residuals[pi], null_variance[pi], perm_key_var)
+    indices = map(lambda _: permute_indices(NROW, NUM_NONZERO), range(NUM_PERMUTATIONS))
+    perm_scores = map(lambda pi: score_stat(null_residuals[pi], null_variance[pi], perm_key_var), indices)
 
     p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
 
