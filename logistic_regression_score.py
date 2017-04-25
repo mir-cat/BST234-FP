@@ -5,6 +5,7 @@ import time
 import random
 import timeit
 from multiprocessing import Pool, TimeoutError
+import os
 
 def import_data(path):
     # path : string
@@ -51,7 +52,7 @@ def permute_indices(N, n):
 if __name__ =='__main__':
     KEY = 'X_1'
     RESPONSE = 'Y'
-    NUM_PERMUTATIONS = 10000
+    NUM_PERMUTATIONS = 1000000
 
     perm_scores = [False for _ in range(NUM_PERMUTATIONS)]
 
@@ -72,19 +73,22 @@ if __name__ =='__main__':
 
     null_score, null_residuals, null_variance = null_score_stat(data, response, key_var)
 
+    # Can remove all other variables besides NUM_PERMUTATIONS, null_residuals, null_variance
+    # For memory performance issues.
+
     # Instead of permuting the entire column, which is mostly 0s,
     # we permute the indices for 1s and 2s, and fill in the column
     perm_key_var = np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1))
 
-    def f(x):
+    def f():
         return permute_indices(NROW, NUM_NONZERO)
 
     def g(pi):
+        pi = f()
         return score_stat(null_residuals[pi], null_variance[pi], perm_key_var)
 
-    with Pool(processes=None) as pool:
-        indices = pool.map(f, range(NUM_PERMUTATIONS))
-        perm_scores = pool.map(g, indices)
+    with Pool(processes=os.cpu_count()//2) as pool:
+        perm_scores = pool.map(g, range(NUM_PERMUTATIONS))
 
     p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
 
