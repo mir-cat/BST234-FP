@@ -3,7 +3,7 @@ import pandas as pd
 import statsmodels.api as sm
 import time
 import random
-
+import threading
 
 def import_data(path):
     # path : string
@@ -28,10 +28,12 @@ def null_score_stat(X, y, key):
 
     key_var = X[key].copy()
 
-    logreg = sm.Logit(y, X)
+    # need to remove X_1 from the logistic regression model
+    X_null = X.drop(key, axis=1)
+    logreg = sm.Logit(y, X_null)
     fit = logreg.fit()
 
-    fitted = fit.predict(X)
+    fitted = fit.predict(X_null)
 
     residuals = fitted - y
     # convert to numpy array for matrix calculation speed
@@ -46,13 +48,20 @@ def null_score_stat(X, y, key):
 def permute_indices(N, n):
     # N, n : integers
     return [random.randint(0, N-1) for _ in range(n)]
-    
+
+def permute(numperm,index):
+        for j in range(numperm):
+            pi = permute_indices(NROW, NUM_NONZERO)
+            perm_null_residuals = null_residuals[pi]
+            perm_null_variance = null_variance[pi]
+            perm_scores[j,index-1] = score_stat(perm_null_residuals, perm_null_variance, perm_key_var)
+ 
 if __name__ =='__main__':
     KEY = 'X_1'
     RESPONSE = 'Y'
-    NUM_PERMUTATIONS = 10000
-
-    perm_scores = [False for _ in range(NUM_PERMUTATIONS)]
+    NUM_PERMUTATIONS = 1000
+    # num threads must go evenly into num_permutations
+    NUM_THREADS = 4
 
     data = import_data('data/data.csv')
     NROW = len(data['Y'])
@@ -75,17 +84,19 @@ if __name__ =='__main__':
     # we permute the indices for 1s and 2s, and fill in the column
     perm_key_var = pd.Series(np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1)))
 
-    # speed this up
-    for i in range(NUM_PERMUTATIONS):
+    # perform permutations in parallel
+    t = [None]*NUM_THREADS
+    perm_scores = np.ones((NUM_PERMUTATIONS//NUM_THREADS, NUM_THREADS))*-1 
+    for i in range(NUM_THREADS):
+        #print(i)
+        t[i] = threading.Thread(target=permute
+                        , args = (NUM_PERMUTATIONS//NUM_THREADS,i))
+        t[i].start()
+    # let sleep so all results in before printing and returning
+    time.sleep(1)
+    #print(perm_scores)
 
-        pi = permute_indices(NROW, NUM_NONZERO)
-
-        perm_null_residuals = null_residuals[pi]
-        perm_null_variance = null_variance[pi]
-        perm_scores[i] = score_stat(perm_null_residuals, perm_null_variance, perm_key_var)
-
-    p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
-
+    p_value = ((perm_scores > null_score).sum())/(NUM_PERMUTATIONS+1)
     print(p_value)
 
     time2 = time.process_time()
