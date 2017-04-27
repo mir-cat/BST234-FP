@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import time
+import random
 
 
 def import_data(path):
@@ -27,24 +28,27 @@ def null_score_stat(X, y, key):
 
     key_var = X[key].copy()
 
-    logreg = sm.Logit(y, X)
+    # need to remove X_1 from the logistic regression model
+    X_null = X.drop(key, axis=1)
+    logreg = sm.Logit(y, X_null)
     fit = logreg.fit()
 
-    fitted = fit.predict(X)
+    fitted = fit.predict(X_null)
+
     residuals = fitted - y
+    # convert to numpy array for matrix calculation speed
+    residuals = residuals.as_matrix()
+
     variance = fitted * (1 - fitted)
 
     score = score_stat(residuals, variance, key_var)
 
     return score, residuals, variance
 
-
-def permute_column(data, col):
-    # data : pandas df
-    # col : string
-
-    data[col] = data[col].sample(frac=1, replace=True).reset_index(drop=True)
-
+def permute_indices(N, n):
+    # N, n : integers
+    return [random.randint(0, N-1) for _ in range(n)]
+    
 if __name__ =='__main__':
     KEY = 'X_1'
     RESPONSE = 'Y'
@@ -52,11 +56,13 @@ if __name__ =='__main__':
 
     perm_scores = [False for _ in range(NUM_PERMUTATIONS)]
 
-
     data = import_data('data/data.csv')
-    nrow = len(data['Y'])
+    NROW = len(data['Y'])
     key_var = data[KEY].copy()
 
+    NUM_ONES = sum(key_var == 1)
+    NUM_TWOS = sum(key_var == 2)
+    NUM_NONZERO = NUM_ONES + NUM_TWOS
 
     response = data[RESPONSE]
     data.drop(RESPONSE, 1, inplace=True)
@@ -67,14 +73,20 @@ if __name__ =='__main__':
     key_var_sq = key_var**2 # 0-1-2 key
     null_score, null_residuals, null_variance = null_score_stat(data, response, KEY)
 
+    # Instead of permuting the entire column, which is mostly 0s,
+    # we permute the indices for 1s and 2s, and fill in the column
+    perm_key_var = pd.Series(np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1)))
 
     # speed this up
     for i in range(NUM_PERMUTATIONS):
-        permute_column(data, KEY)
-        perm_key_var = data[KEY].copy()
-        perm_scores[i] = score_stat(null_residuals, null_variance, perm_key_var)
 
-    p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
+        pi = permute_indices(NROW, NUM_NONZERO)
+
+        perm_null_residuals = null_residuals[pi]
+        perm_null_variance = null_variance[pi]
+        perm_scores[i] = score_stat(perm_null_residuals, perm_null_variance, perm_key_var)
+
+    p_value = sum([(s > null_score) for s in perm_scores])/NUM_PERMUTATIONS
 
     print(p_value)
 
