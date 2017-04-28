@@ -6,7 +6,7 @@ import random
 from multiprocessing import Pool, TimeoutError
 import os
 from math import isclose
-from custom_sample import sample
+from custom_sample import sample, fast_sample, fastest_sample
 
 def import_data(path, response, key):
     # path, response, key: string
@@ -68,7 +68,7 @@ if __name__ =='__main__':
 
     KEY = 'X_1'
     RESPONSE = 'Y'
-    NUM_PERMUTATIONS = 10**4
+    NUM_PERMUTATIONS = 10**5
 
     data, response, key_var = import_data('data/data.csv', RESPONSE, KEY)
     NROW = len(response)
@@ -92,7 +92,7 @@ if __name__ =='__main__':
     with Pool(processes=os.cpu_count()-1) as pool:
         perm_scores = pool.imap_unordered(g, range(NUM_PERMUTATIONS))
         # perm_scores = map(g, range(NUM_PERMUTATIONS))
-        p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
+        p_value = sum([(s > null_score) for s in perm_scores])/(NUM_PERMUTATIONS + 1)
 
     print(p_value)
     time2 = time.time()

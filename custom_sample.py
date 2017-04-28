@@ -4,8 +4,8 @@ from numpy.random import RandomState
 state = RandomState()
 
 
-N = 100000
-K = 2798
+# N = 100000
+# K = 2798
 
 # NOTES:
 
@@ -33,7 +33,7 @@ K = 2798
 # 10000 loops, best of 3: 140 µs per loop
 
 
-def fastest_sample(n, k, state=state, extra=1.02):
+def fastest_sample(n, k, state=state):
     """
     Equivalent to random.sample(range(n), k).
 
@@ -49,15 +49,30 @@ def fastest_sample(n, k, state=state, extra=1.02):
     # it's all in numpy so it has much lower constants than the set-based
     # method below.
 
-    # Generate and sort random ints.
-    ints = state.randint(0, n, int(extra * k))
-    ints.sort()
+    def _fastest_sample(n, k, state=state):
+        # Generate and sort random ints.
+        ints = state.randint(0, n, k)
+        ints.sort()
 
-    # Take uniques by grabbing locations N where array[N] != array[N - 1].
-    # Note that this always throws away the first sample, which is fine.
-    uniques = ints[1:][ints[1:] != ints[:-1]]
+        # Take uniques by grabbing locations N where array[N] != array[N - 1].
+        # We prepend 'True' so as to not throw away the first value
+        uniques = ints[np.concatenate((np.array([True]), ints[1:] != ints[:-1]))]
 
-    return uniques[:k]
+        return uniques
+
+
+    uniques = _fastest_sample(n, k , state)
+
+    while len(uniques) != k:
+        uniques = np.concatenate(
+            (uniques, _fastest_sample(n, k-len(uniques), state))
+        )
+
+    return uniques
+    # if np.random.binomial(1, 0.5):
+    #     return uniques[:k]
+    # else:
+    #     return uniques[-1*k:]
 
 
 def fast_sample(n, k, state=state, extra=1.02):
@@ -74,16 +89,24 @@ def fast_sample(n, k, state=state, extra=1.02):
     """
     # Uniquify using Python's built-in set. I'd expect this to scale better
     # than the sorting method below as N and K get larger.
-    return np.fromiter(
-        set(state.randint(0, n, int(extra * k))),
-        dtype='int64',
-        count=k,
-    )
+    s = None
 
-def sample(n, k, state=state, extra=1.02):
-    s = fastest_sample(n, k, state, extra)
+    while s is None:
+        try:
+            s = np.fromiter(
+                set(state.randint(0, n, int(extra * k))),
+                dtype='int64',
+                count=k,
+            )
+        except Exception:
+            pass
+
+    return s
+
+def sample(n, k, state=state):
+    s = fastest_sample(n, k, state)
 
     while(len(s) != k):
-        s = fastest_sample(n, k, state, extra)
+        s = fastest_sample(n, k, state)
 
     return(s)
