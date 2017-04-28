@@ -5,22 +5,26 @@ import time
 import random
 from multiprocessing import Pool, TimeoutError
 import os
+from math import isclose
+from custom_sample import sample
 
 def import_data(path, response, key):
-    # path : string
+    # path, response, key: string
 
     # numpy import is real slow, even compared to pandas import with conversion
     data = pd.read_csv(path).as_matrix()
 
     # Manual indexing in numpy is super fast compared to pandas
-    r = data[:, 0]
-    k = data[:, 6]
-    data = data[:, 1:5]
-    data = np.column_stack((data, np.ones((data.shape[0], 1)))) #sm.add_constant(data, has_constant='add')
+    r = data[:, 0].copy()
+    k = data[:, 6].copy()
+    data = data[:, 1:6]
+
+    # add constant
+    data = np.column_stack((data, np.ones((data.shape[0], 1))))
     return data, r, k
 
 def score_stat(residuals, variance, key_var):
-    # residuals, variance, key_var : pandas Series
+    # residuals, variance, key_var : 1d np arrays
     key_var_sq = key_var**2
 
     score_numerator = (residuals.transpose().dot(key_var))**2
@@ -30,9 +34,9 @@ def score_stat(residuals, variance, key_var):
     return score
 
 def null_score_stat(X, y, key_var):
-    # X : pandas dataframe
-    # y : pandas series 0-1-2
-    # key : string
+    # X : 2d np array
+    # y : 1d np array 0-1-2
+    # key_var : 1d np array
 
     # key_var = X[key].copy()
 
@@ -42,8 +46,6 @@ def null_score_stat(X, y, key_var):
     fitted = fit.predict(X)
 
     residuals = y - fitted
-    # convert to numpy array for matrix calculation speed
-    # residuals = residuals.as_matrix()
 
     variance = fitted * (1 - fitted)
 
@@ -53,7 +55,8 @@ def null_score_stat(X, y, key_var):
 
 def permute_indices(N, n):
     # N, n : integers
-    return random.sample(range(N), n)
+    # return random.sample(range(N), n)
+    return sample(N, n)
 
 def g(_):
     pi = permute_indices(NROW, NUM_NONZERO)
@@ -61,9 +64,11 @@ def g(_):
     return s
 
 if __name__ =='__main__':
+    state = np.random.RandomState()
+
     KEY = 'X_1'
     RESPONSE = 'Y'
-    NUM_PERMUTATIONS = 10000
+    NUM_PERMUTATIONS = 10**4
 
     data, response, key_var = import_data('data/data.csv', RESPONSE, KEY)
     NROW = len(response)
@@ -77,27 +82,18 @@ if __name__ =='__main__':
 
     null_score, null_residuals, null_variance = null_score_stat(data, response, key_var)
 
+    if not isclose(null_score, 2.2678647166344645):
+        raise AssertionError('Observed Value of Score is Wrong!')
+
     # Instead of permuting the entire column, which is mostly 0s,
     # we permute the indices for 1s and 2s, and fill in the column
     perm_key_var = np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1))
 
-    perm_scores = [False for _ in range(NUM_PERMUTATIONS)]
-
-    # speed this up
-    # for i in range(NUM_PERMUTATIONS):
-    #     perm_scores[i] = g(True)
-    #
-    with Pool(processes=os.cpu_count()//2) as pool:
+    with Pool(processes=os.cpu_count()-1) as pool:
         perm_scores = pool.imap_unordered(g, range(NUM_PERMUTATIONS))
         # perm_scores = map(g, range(NUM_PERMUTATIONS))
         p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
 
-
-    # perm_scores = map(g, range(NUM_PERMUTATIONS))
-
-    # p_value = sum([(s > null_score) or (s < -1*null_score) for s in perm_scores])/NUM_PERMUTATIONS
-
     print(p_value)
-
     time2 = time.time()
     print(time2 - time1)

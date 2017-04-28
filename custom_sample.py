@@ -50,7 +50,7 @@ def fastest_sample(n, k, state=state, extra=1.02):
     # method below.
 
     # Generate and sort random ints.
-    ints = state.randint(0, n + 1, int(extra * k))
+    ints = state.randint(0, n, int(extra * k))
     ints.sort()
 
     # Take uniques by grabbing locations N where array[N] != array[N - 1].
@@ -75,7 +75,7 @@ def fast_sample(n, k, state=state, extra=1.02):
     # Uniquify using Python's built-in set. I'd expect this to scale better
     # than the sorting method below as N and K get larger.
     return np.fromiter(
-        set(state.randint(0, n + 1, int(extra * k))),
+        set(state.randint(0, n, int(extra * k))),
         dtype='int64',
         count=k,
     )
