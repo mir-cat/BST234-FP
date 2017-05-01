@@ -33,7 +33,7 @@ state = RandomState()
 # 10000 loops, best of 3: 140 µs per loop
 
 
-def fastest_sample(n, k, state=state):
+def fastest_sample(n, k, state=state, extra=1.02):
     """
     Equivalent to random.sample(range(n), k).
 
@@ -49,31 +49,37 @@ def fastest_sample(n, k, state=state):
     # it's all in numpy so it has much lower constants than the set-based
     # method below.
 
-    def _fastest_sample(n, k, state=state):
+    def _fastest_sample(n, k, state=state, extra=1.02):
         # Generate and sort random ints.
-        ints = state.randint(0, n, k)
+        ints = state.randint(0, n, int(extra * k))
         ints.sort()
 
         # Take uniques by grabbing locations N where array[N] != array[N - 1].
-        # We prepend 'True' so as to not throw away the first value
-        uniques = ints[np.concatenate((np.array([True]), ints[1:] != ints[:-1]))]
+        # We prepend 'True' so as to not throw away the first value and skew the
+        # random distribution
+        uniques = ints[
+            np.concatenate(
+                (np.array([True]), ints[1:] != ints[:-1])
+            )
+        ]
 
         return uniques
 
 
     uniques = _fastest_sample(n, k , state)
 
-    while len(uniques) != k:
+    while len(uniques) < k:
         uniques = np.concatenate(
-            (uniques, _fastest_sample(n, k-len(uniques), state))
+            (uniques, _fastest_sample(n, k-len(uniques), state, extra=1.0))
         )
 
-    return uniques
-    # if np.random.binomial(1, 0.5):
-    #     return uniques[:k]
-    # else:
-    #     return uniques[-1*k:]
+    # because our key-variable is ordered, we cannot have ordered indices as that
+    # would bias the score statistic calculation and result in undersampling
+    # at the extreme tail
 
+    np.random.shuffle(uniques)
+
+    return uniques[:k]
 
 def fast_sample(n, k, state=state, extra=1.02):
     """
@@ -103,10 +109,10 @@ def fast_sample(n, k, state=state, extra=1.02):
 
     return s
 
-def sample(n, k, state=state):
-    s = fastest_sample(n, k, state)
+def sample(n, k, state=state, extra=1.02):
+    s = fastest_sample(n, k, state, extra)
 
     while(len(s) != k):
-        s = fastest_sample(n, k, state)
+        s = fastest_sample(n, k, state, extra)
 
     return(s)
