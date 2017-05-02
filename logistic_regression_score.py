@@ -6,7 +6,6 @@ import random
 from multiprocessing import Pool, TimeoutError
 import os
 from math import isclose
-from custom_sample import sample, fast_sample, fastest_sample
 
 def import_data(path, response, key):
     # path, response, key: string
@@ -54,36 +53,30 @@ def null_score_stat(X, y, key_var):
 
     return score, residuals, variance
 
-def permute_indices(N, n):
-    # N, n : integers
-    # return random.sample(range(N), n)
-    return fastest_sample(N, n)
-
 def g(_):
-    # pi = fastest_sample(NROW, NUM_NONZERO)
+
+    # sample random set of indices.
+    # Faster than numpy or random
 
     # Generate and sort random ints.
     ints = state.randint(0, NROW, int(1.02 * NUM_NONZERO))
     ints.sort()
 
-    # Take uniques by grabbing locations N where array[N] != array[N - 1].
+    # Take uniques by grabbing locations array[N] != array[N - 1].
     # We prepend 'True' so as to not throw away the first value and skew the
-    # random distribution
+    # sampling distribution
     uniques = ints[
         np.concatenate(
             (np.array([True]), ints[1:] != ints[:-1])
         )
     ]
 
+    # If the first pass does not return a list of length >= NUM_NONZERO
     while len(uniques) < NUM_NONZERO:
 
-        # Generate and sort random ints Of length the difference
         ints = state.randint(0, NROW, NUM_NONZERO-len(uniques))
         ints.sort()
 
-        # Take uniques by grabbing locations N where array[N] != array[N - 1].
-        # We prepend 'True' so as to not throw away the first value and skew the
-        # random distribution
         more_uniques = ints[
             np.concatenate(
                 (np.array([True]), ints[1:] != ints[:-1])
@@ -94,23 +87,19 @@ def g(_):
             (uniques, more_uniques)
         )
 
-    # because our key-variable is ordered, we cannot have ordered indices as that
-    # would bias the score statistic calculation and result in undersampling
-    # at the extreme tail
-
     np.random.shuffle(uniques)
 
+    # In case we generated more than we need.
     uniques = uniques[:NUM_NONZERO]
 
     # Score Stat calculation
     key_var = perm_key_var
     key_var_sq = key_var**2
-
     residuals = null_residuals[uniques]
     variance  = null_variance[uniques]
 
-    score_numerator = (residuals.transpose().dot(key_var))**2
-    score_denominator = key_var_sq.transpose().dot(variance)
+    score_numerator = (residuals.dot(key_var))**2
+    score_denominator = key_var_sq.dot(variance)
     score = score_numerator/score_denominator
 
     return score
@@ -120,7 +109,7 @@ if __name__ =='__main__':
 
     KEY = 'X_1'
     RESPONSE = 'Y'
-    NUM_PERMUTATIONS = 10**6
+    NUM_PERMUTATIONS = 10**7
 
     data, response, key_var = import_data('data/data.csv', RESPONSE, KEY)
     NROW = len(response)
@@ -141,9 +130,9 @@ if __name__ =='__main__':
     # we permute the indices for 1s and 2s, and fill in the column
     perm_key_var = np.concatenate((np.ones(NUM_ONES), np.ones(NUM_TWOS) + 1))
 
-    with Pool(processes=os.cpu_count()-2) as pool:
-        # perm_scores = pool.imap_unordered(g, range(NUM_PERMUTATIONS))
-        perm_scores = map(g, range(NUM_PERMUTATIONS))
+    with Pool(processes=os.cpu_count()) as pool:
+        perm_scores = pool.imap_unordered(g, range(NUM_PERMUTATIONS))
+        # perm_scores = map(g, range(NUM_PERMUTATIONS))
         p_value = sum([(s > null_score) for s in perm_scores])/(NUM_PERMUTATIONS + 1)
 
     print(p_value)
